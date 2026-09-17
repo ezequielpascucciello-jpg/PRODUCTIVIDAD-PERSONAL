@@ -40,11 +40,13 @@ function Admin({profile}){
     const hi=matrix.findIndex(r=>r.some(c=>normal(c)==='DIA')&&r.some(c=>normal(c)==='MES')&&r.some(c=>normal(c)==='LEGAJO')&&r.some(c=>normal(c)==='OBJETIVO'));
     if(hi<0)throw new Error('No se encontró la fila de encabezados.');
     const h=matrix[hi].map(normal),ix=n=>h.indexOf(normal(n)),valid=[];let discarded=0,duplicates=0;const seen=new Set();
-    const{data:emps,error}=await supabase.from('empleados').select('id,legajo');if(error)throw error;const byLeg=new Map((emps||[]).map(e=>[String(e.legajo),e]));
+    const{data:emps,error}=await supabase.from('empleados').select('id,legajo,apellido_nombre,nombre_normalizado');if(error)throw error;const byLeg=new Map((emps||[]).map(e=>[String(e.legajo),e]));const byManualName=new Map((emps||[]).map(e=>[normal(e.nombre_normalizado||e.apellido_nombre),e]));
     for(const r of matrix.slice(hi+1)){
-     const dia=Number(r[ix('Día')]),mes=Number(r[ix('Mes')]),leg=String(r[ix('Legajo')]??'').replace(/\.0$/,''),obj=Number(r[ix('Objetivo')]||0),real=Number(r[ix('Real')]||0);
-     if(!dia||mes<1||mes>12||!leg||obj<=0){discarded++;continue}
-     const emp=byLeg.get(leg);if(!emp){discarded++;continue}
+     const dia=Number(r[ix('Día')]),mes=Number(r[ix('Mes')]),legOriginal=String(r[ix('Legajo')]??'').replace(/\.0$/,''),nombreManual=String(r[ix('Operarios')]??'').trim(),obj=Number(r[ix('Objetivo')]||0),real=Number(r[ix('Real')]||0);
+     if(!dia||mes<1||mes>12||obj<=0){discarded++;continue}
+     const legCompleto=legOriginal&&legOriginal.length<=4?`2900${legOriginal.padStart(4,'0')}`:legOriginal;
+     const emp=byLeg.get(legOriginal)||byLeg.get(legCompleto)||byManualName.get(normal(nombreManual));if(!emp){discarded++;continue}
+     const leg=String(emp.legajo)
      const fecha=`${year}-${String(mes).padStart(2,'0')}-${String(dia).padStart(2,'0')}`,key=`${emp.id}|${fecha}|${obj}|${real}`;
      if(seen.has(key)){duplicates++;continue}seen.add(key);
      valid.push({empleado_id:emp.id,fecha,turno:String(r[ix('Turno')]||''),objetivo:obj,real,diferencia:real-obj,cumplimiento:real/obj,mes,datos_originales:{legajo:leg}})

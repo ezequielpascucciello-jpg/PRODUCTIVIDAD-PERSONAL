@@ -23,17 +23,32 @@ function Admin({profile}){
   await new Promise(r=>setTimeout(r,100));
   try{
    const buf=await file.arrayBuffer();
-   const wb=XLSX.read(buf,{type:'array',dense:true,cellStyles:false,cellNF:false,cellHTML:false});
-   const monthNames=['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'];
+   const wb=XLSX.read(buf,{type:'array',cellStyles:false,cellNF:false,cellHTML:false});
+   const monthNames=[['ENERO','ENE'],['FEBRERO','FEB'],['MARZO','MAR'],['ABRIL','ABR'],['MAYO','MAY'],['JUNIO','JUN'],['JULIO','JUL'],['AGOSTO','AGO'],['SEPTIEMBRE','SEPT','SEP'],['OCTUBRE','OCT'],['NOVIEMBRE','NOV'],['DICIEMBRE','DIC']];
    let sheet=null;
    if(type==='picking')sheet=wb.SheetNames.find(n=>normal(n)==='BAJADA GENERAL');
    if(type==='voice')sheet=wb.SheetNames.find(n=>normal(n)==='ARCHIVEWORKUNIT');
    if(type==='manual')sheet=wb.SheetNames.find(n=>['CARGA DATOS','CARGA DE DATOS'].includes(normal(n)));
-   if(type==='gatera')sheet=wb.SheetNames.find(n=>normal(n)===monthNames[month-1]||normal(n).includes(monthNames[month-1]));
+   if(type==='gatera'){const aliases=monthNames[month-1]||[];sheet=wb.SheetNames.find(n=>aliases.some(a=>normal(n)===a));}
    if(!sheet||!wb.Sheets[sheet])throw new Error(`No se encontró la hoja esperada para ${type}. Hojas disponibles: ${wb.SheetNames.join(', ')}`);
-   const range=XLSX.utils.decode_range(wb.Sheets[sheet]['!ref']||'A1:A1');
-   const rows=Math.max(0,range.e.r-range.s.r);
-   setMsg(`Archivo reconocido. Hoja: ${sheet}. Filas detectadas: ${rows}.`);
+   const ws=wb.Sheets[sheet];
+   let rows=0;
+   if(type==='gatera'){
+    for(const address of Object.keys(ws)){
+     if(address[0]==='!')continue;
+     const pos=XLSX.utils.decode_cell(address);
+     if(pos.c!==2)continue;
+     const cell=ws[address];
+     let d=null;
+     if(cell?.t==='n'){const x=XLSX.SSF.parse_date_code(cell.v);if(x)d={y:x.y,m:x.m}}
+     else if(cell?.v){const text=String(cell.v);const m=text.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})$/);if(m)d={y:+(m[3].length===2?'20'+m[3]:m[3]),m:+m[1]}}
+     if(d&&d.y===year&&d.m===month)rows++;
+    }
+   }else{
+    const range=XLSX.utils.decode_range(ws['!ref']||'A1:A1');
+    rows=Math.max(0,range.e.r-range.s.r);
+   }
+   setMsg(`Archivo reconocido. Hoja: ${sheet}. Registros reales detectados: ${rows}.`);
   }catch(e){setMsg(`No se pudo revisar el archivo: ${e.message}`)}finally{setBusy(false)}
  }
  return <><Header profile={profile}/><main><div className="title"><small>PANEL ADMINISTRADOR</small><h1>Carga mensual</h1><p>Revisá el archivo antes de publicarlo.</p></div><section className="panel admin"><div><label>Tipo de archivo</label><select value={type} onChange={e=>{setType(e.target.value);setMsg('');setFile(null)}}><option value="manual">Clasificación manual</option><option value="picking">Picking</option><option value="gatera">Errores en gatera</option><option value="voice">Errores Voice Picking</option></select></div><div className="twocol"><div><label>Mes</label><input type="number" min="1" max="12" value={month} onChange={e=>setMonth(+e.target.value)}/></div><div><label>Año</label><input type="number" value={year} onChange={e=>setYear(+e.target.value)}/></div></div><label className="upload"><Upload/>Seleccionar Excel<input type="file" accept=".xlsx,.xls" onChange={e=>{setFile(e.target.files[0]);setMsg('')}}/></label>{file&&<p><b>{file.name}</b></p>}<button className="primary" onClick={inspect} disabled={busy}>{busy?'Procesando...':'Revisar archivo'}</button>{msg&&<div className="notice"><AlertTriangle/>{msg}</div>}<p className="note">La última carga válida reemplazará únicamente el mismo módulo, mes y año.</p></section></main></>}

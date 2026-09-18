@@ -66,14 +66,14 @@ function Admin({profile}){
     (variantes||[]).filter(v=>v.activa).forEach(v=>{const e=byId.get(v.empleado_id);if(e)byName.set(normal(v.variante_normalizada),e)});
     const valid=[],unknown=new Map(),seen=new Set();let discarded=0,duplicates=0,totalErrores=0;
     for(const r of matrix.slice(1)){
-     const fecha=excelFecha(r[ix('Fecha')]),verificador=String(r[ix('Verificador')]||'').trim(),estado=normal(r[ix('Estado verif.')]),cancha=String(r[ix('Cancha')]||'').trim().toUpperCase(),paleta=String(r[ix('Nro.Pal.')]??'').trim(),bultos=Number(r[ix('Bultos')]||0);
-     if(!fecha||!['COMPLETADO','CORREGIDO'].includes(estado)||!verificador||!paleta||bultos<=0||!/^C[1-6]$/.test(cancha)){discarded++;continue}
+     const fecha=excelFecha(r[ix('Fecha')]),pickero=String(r[ix('Pickero')]||'').trim(),verificador=String(r[ix('Verificador')]||'').trim(),estado=normal(r[ix('Estado verif.')]),cancha=String(r[ix('Cancha')]||'').trim().toUpperCase(),paleta=String(r[ix('Nro.Pal.')]??'').trim(),bultos=Number(r[ix('Bultos')]||0);
+     if(!fecha||!['COMPLETADO','CORREGIDO'].includes(estado)||!pickero||!paleta||bultos<=0||!/^C[1-6]$/.test(cancha)){discarded++;continue}
      const[y,m]=fecha.split('-').map(Number);if(y!==year||m!==month){discarded++;continue}
-     const emp=byName.get(normal(verificador));if(!emp){unknown.set(normal(verificador),verificador);continue}
+     const emp=byName.get(normal(pickero));if(!emp){unknown.set(normal(pickero),pickero);continue}
      const total=Number(r[ix('Tot. Errores')]||r[ix('Cant.Err.')]||0),motivo=String(r[ix('Motivos ll')]||r[ix('Motivos I')]||r[ix('Motivos')]||(total>0?'Error sin motivo':'Sin novedad')).trim(),nm=normal(motivo),falt=nm.includes('FALT')?total:0,sob=nm.includes('SOBR')?total:0,cambio=(nm.includes('SABOR')||nm.includes('CAMBIO'))?total:0;
      const key=[emp.id,fecha,String(r[ix('Ola')]??''),String(r[ix('Reparto')]??''),paleta,cancha,String(r[ix('Inicio verif.')]??''),String(r[ix('Fin')]??'')].join('|');
      if(seen.has(key)){duplicates++;continue}seen.add(key);totalErrores+=total;
-     valid.push({empleado_id:emp.id,fecha,turno:String(r[ix('Turno')]||''),cancha,numero_paleta:paleta,bultos,motivo,total_errores:total,faltantes:falt,sobrantes:sob,cambio_sabor:cambio,datos_originales:{verificador,pickero:String(r[ix('Pickero')]||''),estado_verificacion:String(r[ix('Estado verif.')]||''),ola:r[ix('Ola')],reparto:r[ix('Reparto')],inicio_verificacion:r[ix('Inicio verif.')],fin_verificacion:r[ix('Fin')]}})
+     valid.push({empleado_id:emp.id,fecha,turno:String(r[ix('Turno')]||''),cancha,numero_paleta:paleta,bultos,motivo,total_errores:total,faltantes:falt,sobrantes:sob,cambio_sabor:cambio,datos_originales:{pickero,verificador,estado_verificacion:String(r[ix('Estado verif.')]||''),ola:r[ix('Ola')],reparto:r[ix('Reparto')],inicio_verificacion:r[ix('Inicio verif.')],fin_verificacion:r[ix('Fin')]}})
     }
     setReview({tipo:'voice',valid,unknown:[...unknown.values()],discarded,duplicates,read:matrix.length-1,sheet:'ArchiveWorkUnit',totalErrores});
     setMsg('Vista previa de Errores Voice Picking terminada. Revisá antes de publicar.');setBusy(false);return;
